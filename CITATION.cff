@@ -1,15 +1,22 @@
 cff-version: 1.2.0
 message: "If you use this code, please cite it as below."
+type: software
 title: "EEG Motor Imagery Classification with Log-Covariance Features and XGBoost"
+abstract: >-
+  A small cross-subject EEG motor imagery classifier (left hand, right hand,
+  both hands, both feet) with participant-grouped cross-validation, plus a
+  one-command reproduction on the public PhysioNet EEG Motor
+  Movement/Imagery Database.
 authors:
   - family-names: Dastanov
     given-names: Elchibek
-year: 2026
-url: "https://github.com/elchibek5/Rice-NeuroWave-Hackathon-2026"
 license: MIT
+repository-code: "https://github.com/elchibek5/Rice-NeuroWave-Hackathon-2026"
+date-released: 2026-10-17
 keywords:
   - EEG
   - motor imagery
   - brain-computer interface
   - Riemannian geometry
   - XGBoost
+  - PhysioNet EEGMMIDB

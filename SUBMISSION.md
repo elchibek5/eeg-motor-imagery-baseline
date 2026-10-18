@@ -8,8 +8,8 @@
     source .venv/bin/activate
 
     python3 run_pipeline.py \
-      --train_dir "/Users/elchibekdastanov/Downloads/Training" \
-      --eval_dir "/Users/elchibekdastanov/Downloads/Evaluation" \
+      --train_dir path/to/Training \
+      --eval_dir path/to/Evaluation \
       --out_dir predictions \
       --model_out model.joblib
 
