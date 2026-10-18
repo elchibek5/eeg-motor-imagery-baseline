@@ -127,6 +127,60 @@ def featurize_subject(X: np.ndarray, feature_set: str) -> np.ndarray:
 # Data loading + caching
 # ----------------------------
 
+# identifies the exact .npy a cached feature file was computed from
+def _source_signature(path: str) -> dict:
+    st = os.stat(path)
+    return {
+        "src_path": os.path.abspath(path),
+        "src_size": int(st.st_size),
+        "src_mtime_ns": int(st.st_mtime_ns),
+    }
+
+
+# returns cached features only if they were computed from this exact source file
+def _read_cache(cache_path: str, sig: dict):
+    if not os.path.exists(cache_path):
+        return None
+    try:
+        with np.load(cache_path, allow_pickle=False) as z:
+            if any(k not in z.files for k in ("X", *sig)):
+                return None  # old cache without a source signature: recompute
+            if (str(z["src_path"]) != sig["src_path"]
+                    or int(z["src_size"]) != sig["src_size"]
+                    or int(z["src_mtime_ns"]) != sig["src_mtime_ns"]):
+                return None
+            return z["X"]
+    except Exception:
+        return None  # unreadable cache file: recompute
+
+
+def _write_cache(cache_path: str, feats: np.ndarray, sig: dict):
+    tmp = f"{cache_path}.{os.getpid()}.tmp"
+    with open(tmp, "wb") as f:
+        np.savez_compressed(
+            f,
+            X=feats,
+            src_path=np.array(sig["src_path"]),
+            src_size=np.array(sig["src_size"], dtype=np.int64),
+            src_mtime_ns=np.array(sig["src_mtime_ns"], dtype=np.int64),
+        )
+    os.replace(tmp, cache_path)
+
+
+# loads one participant file and featurizes it, reusing the cache when it matches the source
+def featurize_file(x_path: str, feature_set: str, cache_path: str | None = None) -> np.ndarray:
+    sig = _source_signature(x_path) if cache_path else None
+    if cache_path:
+        feats = _read_cache(cache_path, sig)
+        if feats is not None:
+            return feats
+    X = np.load(x_path, allow_pickle=True)
+    feats = featurize_subject(X, feature_set)
+    if cache_path:
+        _write_cache(cache_path, feats, sig)
+    return feats
+
+
 # finds all participant IDs that have X_train_*.npy files
 def list_participant_ids(train_dir: str):
     ids = []
@@ -168,14 +222,7 @@ def load_training(train_dir: str, feature_set: str, cache_dir: str | None):
         if cache_dir:
             cache_path = os.path.join(cache_dir, f"feats_{feature_set}_{pid}.npz")
 
-        if cache_path and os.path.exists(cache_path):
-            z = np.load(cache_path, allow_pickle=True)
-            feats = z["X"]
-        else:
-            X = np.load(x_path, allow_pickle=True)
-            feats = featurize_subject(X, feature_set)
-            if cache_path:
-                np.savez_compressed(cache_path, X=feats)
+        feats = featurize_file(x_path, feature_set, cache_path)
 
         y = np.load(y_path, allow_pickle=True)
         y = np.asarray(y).reshape(-1)
@@ -256,18 +303,20 @@ def train_with_group_cv(X: np.ndarray, y: np.ndarray, groups: np.ndarray, seed: 
     y_pred = np.concatenate(all_pred)
 
     cm = confusion_matrix(y_true, y_pred)
-    with open("cv_confusion_matrix.txt", "w") as f:
-        f.write("Confusion Matrix (rows=true, cols=pred):\n")
-        f.write(np.array2string(cm) + "\n\n")
-        f.write("Labels order:\n")
-        f.write(str(list(le.classes_)) + "\n\n")
-        f.write("Classification Report:\n")
-        f.write(classification_report(y_true, y_pred, target_names=le.classes_))
-        f.write("\n")
+    # written to disk by main() once the feature set is chosen, so the file
+    # always describes the selected model (in auto mode several are tried)
+    cv_report = (
+        "Confusion Matrix (rows=true, cols=pred):\n"
+        + np.array2string(cm) + "\n\n"
+        + "Labels order:\n"
+        + str(list(le.classes_)) + "\n\n"
+        + "Classification Report:\n"
+        + classification_report(y_true, y_pred, target_names=le.classes_)
+        + "\n"
+    )
 
     print("\nConfusion Matrix (rows=true, cols=pred):")
     print(cm)
-    print("Saved cv_confusion_matrix.txt")
 
     # Train full model on all data (with scaler)
     full_scaler = StandardScaler(with_mean=True, with_std=True)
@@ -282,13 +331,31 @@ def train_with_group_cv(X: np.ndarray, y: np.ndarray, groups: np.ndarray, seed: 
         "label_encoder": le,
         "cv_mean_acc": mean_acc,
         "cv_std_acc": std_acc,
+        "cv_fold_acc": [float(a) for a in scores],
+        "cv_report": cv_report,
     }
 
 
+# where a report file goes; "." keeps the historical bare file name in the cwd
+def _report_path(report_dir: str, name: str) -> str:
+    if report_dir in ("", "."):
+        return name
+    os.makedirs(report_dir, exist_ok=True)
+    return os.path.join(report_dir, name)
+
+
+def write_cv_report(bundle, report_dir: str = "."):
+    path = _report_path(report_dir, "cv_confusion_matrix.txt")
+    with open(path, "w") as f:
+        f.write(bundle["cv_report"])
+    print(f"Saved {path}")
+
+
 # dumps top feature importances to a txt file (mostly for debugging/insight)
-def compute_feature_importance(bundle, feature_set: str):
+def compute_feature_importance(bundle, feature_set: str, report_dir: str = "."):
     """Save top-20 gain importances + explain feature indexing."""
     try:
+        path = _report_path(report_dir, "feature_importance_top20.txt")
         model = bundle["full_model"]
         booster = model.get_booster()
         score = booster.get_score(importance_type="gain")  # {"f0": val, ...}
@@ -304,7 +371,7 @@ def compute_feature_importance(bundle, feature_set: str):
         for idx, val in top:
             lines.append(f"f{idx}: {val:.6f}")
 
-        with open("feature_importance_top20.txt", "w") as f:
+        with open(path, "w") as f:
             f.write("\n".join(lines) + "\n\n")
             f.write(f"Feature set: {feature_set}\n\n")
             if feature_set in ("bandpower", "combo"):
@@ -320,7 +387,7 @@ def compute_feature_importance(bundle, feature_set: str):
                 f.write("Indexing corresponds to np.triu_indices(64).\n")
 
         print("\n" + "\n".join(lines))
-        print("Saved feature_importance_top20.txt")
+        print(f"Saved {path}")
     except Exception as e:
         print("Could not compute feature importance:", e)
 
@@ -344,6 +411,7 @@ def predict_eval(bundle, eval_dir: str, out_dir: str, feature_set: str, cache_di
     if cache_dir:
         os.makedirs(cache_dir, exist_ok=True)
 
+    preds = {}
     for pid in ids:
         x_test = os.path.join(eval_dir, f"X_test_{pid}.npy")
         x_eval = os.path.join(eval_dir, f"X_eval_{pid}.npy")
@@ -354,13 +422,7 @@ def predict_eval(bundle, eval_dir: str, out_dir: str, feature_set: str, cache_di
         if cache_dir:
             cache_path = os.path.join(cache_dir, f"feats_eval_{feature_set}_{pid}.npz")
 
-        if cache_path and os.path.exists(cache_path):
-            feats = np.load(cache_path, allow_pickle=True)["X"]
-        else:
-            X = np.load(x_path, allow_pickle=True)
-            feats = featurize_subject(X, feature_set)
-            if cache_path:
-                np.savez_compressed(cache_path, X=feats)
+        feats = featurize_file(x_path, feature_set, cache_path)
 
         # ensemble over folds (each has its scaler)
         probs = None
@@ -380,6 +442,84 @@ def predict_eval(bundle, eval_dir: str, out_dir: str, feature_set: str, cache_di
         pred_labels = le.inverse_transform(pred_enc).astype(object).reshape(-1, 1)
         np.save(os.path.join(out_dir, f"y_pred_{pid}.npy"), pred_labels)
         print(f"Saved y_pred_{pid}.npy with shape {pred_labels.shape}")
+        preds[pid] = pred_labels
+
+    return preds
+
+
+# ----------------------------
+# Held-out scoring
+# ----------------------------
+
+def _label_path(eval_labels_dir: str, pid: str) -> str:
+    return os.path.join(eval_labels_dir, f"y_eval_{pid}.npy")
+
+
+# fails fast (before training) if held-out labels are missing or live next to the eval inputs
+def check_eval_labels(eval_dir: str, eval_labels_dir: str):
+    if os.path.realpath(eval_labels_dir) == os.path.realpath(eval_dir):
+        raise ValueError(
+            "--eval_labels_dir must be a separate folder from --eval_dir; "
+            "evaluation labels are never read from the evaluation input folder"
+        )
+    if not os.path.isdir(eval_labels_dir):
+        raise FileNotFoundError(f"--eval_labels_dir not found: {eval_labels_dir}")
+    missing = [pid for pid in list_eval_ids(eval_dir) if not os.path.exists(_label_path(eval_labels_dir, pid))]
+    if missing:
+        raise FileNotFoundError(f"Missing y_eval_<id>.npy in {eval_labels_dir} for ids: {', '.join(missing)}")
+
+
+def _as_label_strings(a) -> np.ndarray:
+    return np.array([str(v) for v in np.asarray(a).reshape(-1)])
+
+
+# scores saved predictions against held-out labels and writes heldout_report.txt
+def heldout_report(preds: dict, eval_labels_dir: str, report_dir: str = "."):
+    y_true_all, y_pred_all, rows = [], [], []
+    for pid, pred in preds.items():
+        y_true = _as_label_strings(np.load(_label_path(eval_labels_dir, pid), allow_pickle=True))
+        y_pred = _as_label_strings(pred)
+        if y_true.shape[0] != y_pred.shape[0]:
+            raise ValueError(f"Mismatch pid={pid}: predictions={y_pred.shape[0]} vs labels={y_true.shape[0]}")
+        rows.append((pid, len(y_true), float(np.mean(y_true == y_pred))))
+        y_true_all.append(y_true)
+        y_pred_all.append(y_pred)
+
+    y_true = np.concatenate(y_true_all)
+    y_pred = np.concatenate(y_pred_all)
+    labels = sorted({str(v) for v in y_true} | {str(v) for v in y_pred})
+    acc = accuracy_score(y_true, y_pred)
+    subj = np.array([r[2] for r in rows])
+    cm = confusion_matrix(y_true, y_pred, labels=labels)
+
+    lines = [
+        "Held-out evaluation (participants never seen in training or CV)",
+        f"Labels folder: {eval_labels_dir}",
+        f"Participants: {len(rows)}  Epochs: {len(y_true)}",
+        f"Accuracy (all epochs pooled): {acc:.4f}",
+        f"Per-participant accuracy: mean {subj.mean():.4f} ± {subj.std():.4f} "
+        f"(min {subj.min():.4f}, max {subj.max():.4f})",
+        "",
+        "Per-participant accuracy:",
+        "  id  epochs  accuracy",
+        *[f"{pid:>4}  {n:>6}  {a:.4f}" for pid, n, a in rows],
+        "",
+        "Confusion Matrix (rows=true, cols=pred):",
+        np.array2string(cm),
+        "",
+        "Labels order:",
+        str(labels),
+        "",
+        "Classification Report:",
+        classification_report(y_true, y_pred, labels=labels, zero_division=0),
+    ]
+    text = "\n".join(lines) + "\n"
+    path = _report_path(report_dir, "heldout_report.txt")
+    with open(path, "w") as f:
+        f.write(text)
+    print("\n" + text)
+    print(f"Saved {path}")
+    return {"accuracy": float(acc), "subject_mean": float(subj.mean()), "subject_std": float(subj.std())}
 
 
 # ----------------------------
@@ -396,7 +536,15 @@ def main():
     ap.add_argument("--cache_dir", default="cache_features")
     ap.add_argument("--feature_set", default="auto", choices=["auto", "bandpower", "covlog", "combo"])
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--n_estimators", type=int, default=800, help="XGBoost trees per model")
+    ap.add_argument("--eval_labels_dir", default=None,
+                    help="Optional folder of y_eval_<id>.npy; scores the predictions and writes heldout_report.txt")
+    ap.add_argument("--report_dir", default=".",
+                    help="Where cv_confusion_matrix.txt, feature_importance_top20.txt and heldout_report.txt go")
     args = ap.parse_args()
+
+    if args.eval_labels_dir:
+        check_eval_labels(args.eval_dir, args.eval_labels_dir)
 
     # Decide feature set
     candidates = ["bandpower", "covlog"] if args.feature_set == "auto" else [args.feature_set]
@@ -412,7 +560,7 @@ def main():
         print(f"Training matrix: {X.shape}, labels: {y.shape}, unique participants: {len(np.unique(groups))}")
 
         print("Training with participant-safe GroupKFold CV...")
-        bundle = train_with_group_cv(X, y, groups, seed=args.seed, n_estimators=800)
+        bundle = train_with_group_cv(X, y, groups, seed=args.seed, n_estimators=args.n_estimators)
 
         if bundle["cv_mean_acc"] > best_acc:
             best_acc = bundle["cv_mean_acc"]
@@ -421,13 +569,18 @@ def main():
 
     print(f"\n=== Selected feature_set: {best_feat} (CV mean acc={best_acc:.4f}) ===")
 
-    compute_feature_importance(best_bundle, best_feat)
+    write_cv_report(best_bundle, args.report_dir)
+    compute_feature_importance(best_bundle, best_feat, args.report_dir)
 
     joblib.dump({"feature_set": best_feat, **best_bundle}, args.model_out)
     print(f"Saved model bundle to {args.model_out}")
 
     print("Generating predictions for evaluation set...")
-    predict_eval(best_bundle, args.eval_dir, args.out_dir, best_feat, args.cache_dir)
+    preds = predict_eval(best_bundle, args.eval_dir, args.out_dir, best_feat, args.cache_dir)
+
+    if args.eval_labels_dir:
+        print("Scoring predictions against held-out labels...")
+        heldout_report(preds, args.eval_labels_dir, args.report_dir)
 
     print("\nDone. Zip the files in your out_dir and submit them.")
 
