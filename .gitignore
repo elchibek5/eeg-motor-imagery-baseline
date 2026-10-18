@@ -14,6 +14,7 @@ venv/
 
 # Data (DO NOT COMMIT)
 *.npy
+data/
 Training/
 Evaluation/
 Challenge_Dataset*/
