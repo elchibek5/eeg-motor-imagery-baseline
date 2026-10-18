@@ -95,8 +95,8 @@ The [dataset page](https://physionet.org/content/eegmmidb/1.0.0/) also gives a c
 Requires Python 3.10 or newer.
 
 ```bash
-git clone https://github.com/elchibek5/Rice-NeuroWave-Hackathon-2026.git
-cd Rice-NeuroWave-Hackathon-2026
+git clone https://github.com/elchibek5/eeg-motor-imagery-baseline.git
+cd eeg-motor-imagery-baseline
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 ```
@@ -262,13 +262,13 @@ If this code is useful in your research, please cite it (GitHub's *Cite this rep
   author = {Dastanov, Elchibek},
   title  = {EEG Motor Imagery Classification with Log-Covariance Features and XGBoost},
   year   = {2026},
-  url    = {https://github.com/elchibek5/Rice-NeuroWave-Hackathon-2026}
+  url    = {https://github.com/elchibek5/eeg-motor-imagery-baseline}
 }
 ```
 
 ## Related
 
-[PaperPilot-Gemini](https://github.com/elchibek5/PaperPilot-Gemini) — a research copilot built alongside this project: summarises PDF papers, extracts claims / method / results, drafts a replication plan and answers questions with citations.
+[PaperPilot](https://github.com/elchibek5/paperpilot) — reviews ML papers for reproducibility and checks every quoted citation against the paper text; works inside a coding agent with no API key.
 
 ## License
 

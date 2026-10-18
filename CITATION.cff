@@ -11,7 +11,7 @@ authors:
   - family-names: Dastanov
     given-names: Elchibek
 license: MIT
-repository-code: "https://github.com/elchibek5/Rice-NeuroWave-Hackathon-2026"
+repository-code: "https://github.com/elchibek5/eeg-motor-imagery-baseline"
 date-released: 2026-10-17
 keywords:
   - EEG
