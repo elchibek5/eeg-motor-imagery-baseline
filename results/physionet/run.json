@@ -1,0 +1,109 @@
+{
+  "date": "2026-10-17",
+  "git_commit": "b6eb0037752f428a42a15195752a0c822b1bb582",
+  "code_modified_since_commit": false,
+  "commands": [
+    "python prepare_physionet.py",
+    "python run_pipeline.py --train_dir data/physionet/Training --eval_dir data/physionet/Evaluation --eval_labels_dir data/physionet/Evaluation_labels --out_dir data/physionet/predictions --model_out data/physionet/model.joblib --cache_dir data/physionet/cache --report_dir results/physionet --feature_set auto"
+  ],
+  "python": "3.14.7",
+  "versions": {
+    "numpy": "2.5.4",
+    "scipy": "1.18.1",
+    "scikit-learn": "1.9.1",
+    "xgboost": "3.4.1",
+    "joblib": "1.6.0",
+    "mne": "1.13.2"
+  },
+  "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "cpu": "Apple M3 Pro",
+  "cpu_count": 11,
+  "wall_time_s": 1903.6,
+  "dataset": {
+    "name": "PhysioNet EEG Motor Movement/Imagery Database 1.0.0",
+    "runs": [
+      4,
+      6,
+      8,
+      10,
+      12,
+      14
+    ],
+    "epoch": "656 samples (4.1 s) from each T1/T2 onset, 64 EEG channels, microvolts, no filtering, no re-referencing",
+    "train": {
+      "subject_ids": "1-89",
+      "subjects": 88,
+      "epochs": 7883,
+      "per_class": {
+        "both_feet": 1964,
+        "both_hands": 1975,
+        "left_hand": 1991,
+        "right_hand": 1953
+      }
+    },
+    "heldout": {
+      "subject_ids": "90-109",
+      "subjects": 18,
+      "epochs": 1612,
+      "per_class": {
+        "both_feet": 408,
+        "both_hands": 400,
+        "left_hand": 405,
+        "right_hand": 399
+      }
+    },
+    "skipped_subjects": {
+      "88": "sampling rate 128 Hz in run 4",
+      "92": "sampling rate 128 Hz in run 4",
+      "100": "sampling rate 128 Hz in run 4"
+    }
+  },
+  "model": {
+    "n_estimators": 800,
+    "seed": 42,
+    "feature_set_requested": "auto"
+  },
+  "feature_set_candidates": {
+    "bandpower": {
+      "folds": [
+        0.3266,
+        0.3242,
+        0.3292,
+        0.3431,
+        0.3375
+      ],
+      "mean": 0.3321,
+      "std": 0.0071
+    },
+    "covlog": {
+      "folds": [
+        0.4522,
+        0.4335,
+        0.4404,
+        0.4326,
+        0.3996
+      ],
+      "mean": 0.4317,
+      "std": 0.0175
+    }
+  },
+  "selected_feature_set": "covlog",
+  "cv": {
+    "protocol": "GroupKFold(5) by subject over the training subjects",
+    "folds": [
+      0.4522,
+      0.4335,
+      0.4404,
+      0.4326,
+      0.3996
+    ],
+    "mean": 0.4317,
+    "std": 0.0175
+  },
+  "heldout": {
+    "protocol": "fold-ensemble trained on subjects 1-89, scored on subjects 90-109",
+    "accuracy": 0.4578,
+    "per_subject_mean": 0.4575,
+    "per_subject_std": 0.1007
+  }
+}

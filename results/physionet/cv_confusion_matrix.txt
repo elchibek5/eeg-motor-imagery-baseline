@@ -1,0 +1,21 @@
+Confusion Matrix (rows=true, cols=pred):
+[[803 480 357 324]
+ [457 811 366 341]
+ [329 341 970 351]
+ [361 351 424 817]]
+
+Labels order:
+[np.str_('both_feet'), np.str_('both_hands'), np.str_('left_hand'), np.str_('right_hand')]
+
+Classification Report:
+              precision    recall  f1-score   support
+
+   both_feet       0.41      0.41      0.41      1964
+  both_hands       0.41      0.41      0.41      1975
+   left_hand       0.46      0.49      0.47      1991
+  right_hand       0.45      0.42      0.43      1953
+
+    accuracy                           0.43      7883
+   macro avg       0.43      0.43      0.43      7883
+weighted avg       0.43      0.43      0.43      7883
+

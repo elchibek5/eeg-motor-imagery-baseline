@@ -1,0 +1,27 @@
+Top 20 feature importances (gain):
+f1458: 7.089536
+f1584: 4.847006
+f1703: 4.050436
+f999: 3.940923
+f1707: 3.368839
+f569: 3.206755
+f196: 3.162633
+f215: 3.119701
+f622: 3.110506
+f1265: 3.068294
+f709: 3.024051
+f1273: 2.976462
+f623: 2.963178
+f213: 2.952432
+f1415: 2.940407
+f2002: 2.914242
+f1303: 2.882586
+f1590: 2.863327
+f1274: 2.844117
+f1927: 2.842094
+
+Feature set: covlog
+
+CovLog layout:
+Upper-triangle of 64x64 log-covariance (including diag): 2080 feats.
+Indexing corresponds to np.triu_indices(64).
