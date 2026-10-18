@@ -457,13 +457,15 @@ def _label_path(eval_labels_dir: str, pid: str) -> str:
 
 # fails fast (before training) if held-out labels are missing or live next to the eval inputs
 def check_eval_labels(eval_dir: str, eval_labels_dir: str):
-    if os.path.realpath(eval_labels_dir) == os.path.realpath(eval_dir):
+    if not os.path.isdir(eval_labels_dir):
+        raise FileNotFoundError(f"--eval_labels_dir not found: {eval_labels_dir}")
+    # samefile, not a path comparison: symlinks and case-insensitive file
+    # systems (macOS default) can give one folder several names
+    if os.path.isdir(eval_dir) and os.path.samefile(eval_labels_dir, eval_dir):
         raise ValueError(
             "--eval_labels_dir must be a separate folder from --eval_dir; "
             "evaluation labels are never read from the evaluation input folder"
         )
-    if not os.path.isdir(eval_labels_dir):
-        raise FileNotFoundError(f"--eval_labels_dir not found: {eval_labels_dir}")
     missing = [pid for pid in list_eval_ids(eval_dir) if not os.path.exists(_label_path(eval_labels_dir, pid))]
     if missing:
         raise FileNotFoundError(f"Missing y_eval_<id>.npy in {eval_labels_dir} for ids: {', '.join(missing)}")
