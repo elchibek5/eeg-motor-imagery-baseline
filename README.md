@@ -31,7 +31,7 @@ Built for the Rice NeuroWave Hackathon 2026, then reproduced on the public **Phy
 
 CV accuracy is the mean ± standard deviation over the five folds. Held-out accuracy is pooled over all 1,612 held-out epochs; per subject it is 45.7% ± 10.1% (range 34.4% to 72.2%). Sources: [`results/physionet/run.json`](results/physionet/run.json) and the reports next to it for PhysioNet; [`cv_confusion_matrix.txt`](cv_confusion_matrix.txt) for the hackathon run.
 
-On both datasets the log-covariance features won the `--feature_set auto` comparison; bandpower-only features scored lower under the same split (33.2% ± 0.7% CV on PhysioNet). The hackathon run also produced predictions for 20 evaluation participants, submitted as `predictions.zip` (not in this repo).
+On both datasets the log-covariance features won the `--feature_set auto` comparison; bandpower-only features scored lower under the same split (33.0% ± 0.9% CV on PhysioNet; 33.2% before the [#1](https://github.com/elchibek5/eeg-motor-imagery-baseline/issues/1) fix kept channel amplitude and added left/right features). The hackathon run also produced predictions for 20 evaluation participants, submitted as `predictions.zip` (not in this repo).
 
 Per-class F1 from each run's report (precision and recall are in the same files):
 

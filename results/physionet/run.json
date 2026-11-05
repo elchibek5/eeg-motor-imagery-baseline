@@ -1,6 +1,6 @@
 {
-  "date": "2026-10-17",
-  "git_commit": "b6eb0037752f428a42a15195752a0c822b1bb582",
+  "date": "2026-11-05",
+  "git_commit": "6135ad732b7e94f14d334acdcdb04caed567e5b7",
   "code_modified_since_commit": false,
   "commands": [
     "python prepare_physionet.py",
@@ -15,10 +15,10 @@
     "joblib": "1.6.0",
     "mne": "1.13.2"
   },
-  "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "platform": "macOS-27.2-arm64-arm-64bit-Mach-O",
   "cpu": "Apple M3 Pro",
   "cpu_count": 11,
-  "wall_time_s": 1903.6,
+  "wall_time_s": 2185.4,
   "dataset": {
     "name": "PhysioNet EEG Motor Movement/Imagery Database 1.0.0",
     "runs": [
@@ -66,14 +66,14 @@
   "feature_set_candidates": {
     "bandpower": {
       "folds": [
-        0.3266,
-        0.3242,
-        0.3292,
-        0.3431,
-        0.3375
+        0.3194,
+        0.3209,
+        0.3311,
+        0.3381,
+        0.3418
       ],
-      "mean": 0.3321,
-      "std": 0.0071
+      "mean": 0.3302,
+      "std": 0.009
     },
     "covlog": {
       "folds": [
