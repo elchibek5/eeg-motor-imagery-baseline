@@ -27,25 +27,40 @@ def bandpower(sig: np.ndarray, low: float, high: float, fs: int = FS) -> float:
     return float(np.trapezoid(psd[mask], freqs[mask])) if np.any(mask) else 0.0
 
 
+BANDS = [
+    ("delta", 1, 4),
+    ("theta", 4, 8),
+    ("mu",    8, 12),
+    ("beta",  12, 30),
+    ("gamma", 30, 45),
+]
+FEATS_PER_CHANNEL = 14
+
+# Left/right motor-strip pairs as channel indices in the EEGMMIDB 64-channel
+# order (FC3=1, FC4=5, C3=8, C4=12, CP3=15, CP4=19). Data in another channel
+# order gets the same columns, but they no longer mean C3 vs C4.
+HEMI_PAIRS = [("FC3", 1, "FC4", 5), ("C3", 8, "C4", 12), ("CP3", 15, "CP4", 19)]
+
+
 # makes basic per-channel stats + EEG bandpower features
 def features_bandpower(epoch: np.ndarray) -> np.ndarray:
     """
     epoch: (64, 656)
     Per-channel: mean, std, ptp, rms + log bandpower (delta/theta/mu/beta/gamma)
-    + relative bandpower (same bands). 14 feats/channel => 896 total.
+    + relative bandpower (same bands). 14 feats/channel => 896.
+    Then, per hemispheric pair (FC3/FC4, C3/C4, CP3/CP4) and band, the left
+    minus right log bandpower: 15 more => 911 total.
+
+    Channels are not rescaled per epoch: the left/right imagery signal is the
+    amplitude difference between hemispheres, which a per-channel z-score
+    erases. Subject gain cancels in the log-power differences, and the
+    StandardScaler fit inside each fold handles feature scale.
     """
     feats = []
-    bands = [
-        ("delta", 1, 4),
-        ("theta", 4, 8),
-        ("mu",    8, 12),
-        ("beta",  12, 30),
-        ("gamma", 30, 45),
-    ]
+    log_bp_by_ch = []
 
     for ch in range(epoch.shape[0]):
         sig = epoch[ch].astype(np.float64)
-        sig = (sig - sig.mean()) / (sig.std() + 1e-12)
 
         mean = float(sig.mean())
         std  = float(sig.std())
@@ -56,12 +71,17 @@ def features_bandpower(epoch: np.ndarray) -> np.ndarray:
 
         log_bp = []
         rel_bp = []
-        for _, lo, hi in bands:
+        for _, lo, hi in BANDS:
             p = bandpower(sig, lo, hi)
             log_bp.append(float(np.log(p + 1e-12)))
             rel_bp.append(float(p / total))
 
         feats.extend([mean, std, ptp, rms, *log_bp, *rel_bp])
+        log_bp_by_ch.append(log_bp)
+
+    if epoch.shape[0] > max(right for _, _, _, right in HEMI_PAIRS):
+        for _, left, _, right in HEMI_PAIRS:
+            feats.extend(np.subtract(log_bp_by_ch[left], log_bp_by_ch[right]).tolist())
 
     return np.array(feats, dtype=np.float32)
 
@@ -380,7 +400,9 @@ def compute_feature_importance(bundle, feature_set: str, report_dir: str = "."):
                 f.write("4 log_delta, 5 log_theta, 6 log_mu, 7 log_beta, 8 log_gamma,\n")
                 f.write("9 rel_delta, 10 rel_theta, 11 rel_mu, 12 rel_beta, 13 rel_gamma\n")
                 f.write("Channel index = feature_index // 14\n")
-                f.write("Feature-in-channel index = feature_index % 14\n\n")
+                f.write("Feature-in-channel index = feature_index % 14\n")
+                f.write("896-910: left minus right log bandpower, (FC3-FC4, C3-C4, CP3-CP4) x\n")
+                f.write("(delta, theta, mu, beta, gamma), in that order\n\n")
             if feature_set in ("covlog", "combo"):
                 f.write("CovLog layout:\n")
                 f.write("Upper-triangle of 64x64 log-covariance (including diag): 2080 feats.\n")

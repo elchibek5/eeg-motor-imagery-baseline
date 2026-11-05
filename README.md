@@ -182,7 +182,7 @@ X_eval_<id>.npy  ──┘
 
 **Features.** Two families, chosen automatically by CV:
 
-- *Bandpower* (14 per channel, 896 total) — mean, std, peak-to-peak, RMS, log power and relative power in the delta (1–4 Hz), theta (4–8), mu (8–12), beta (12–30) and gamma (30–45) bands, from a Welch PSD of each z-scored channel.
+- *Bandpower* (14 per channel plus 15 hemispheric, 911 total) — mean, std, peak-to-peak, RMS, log power and relative power in the delta (1–4 Hz), theta (4–8), mu (8–12), beta (12–30) and gamma (30–45) bands, from a Welch PSD of each channel in microvolts; then left minus right log power per band for FC3/FC4, C3/C4 and CP3/CP4 (channel indices assume the EEGMMIDB channel order). Channels are not rescaled per epoch, because that erases the left/right amplitude difference ([#1](https://github.com/elchibek5/eeg-motor-imagery-baseline/issues/1)).
 - *Log-covariance* (2,080 total) — the channel covariance matrix of each epoch, shrunk 10% toward a scaled identity for numerical stability, mapped through the matrix logarithm via eigendecomposition, upper triangle flattened. This is the log-Euclidean form of the Riemannian approach to motor imagery: it describes the *relationships between channels* rather than any single channel's spectrum.
 
 **Validation.** `GroupKFold(n_splits=5)` with participant ID as the group. Splitting by epoch would let the model memorise each person's EEG signature and inflate accuracy; the numbers above are the honest cross-subject figures.
